@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (required, 'admin' | 'recruiter')
+    //   - name: string (optional)
+    //
+    // Collection: jobs
+    // Document ID: {jobId}
+    // Fields:
+    //   - title: string (required)
+    //   - description: string (required)
+    //   - requirements: list (optional)
+    //   - status: string (required, 'open' | 'closed')
+    //   - createdAt: timestamp (required)
+    //   - createdBy: string (required, userId)
+    //
+    // Collection: candidates
+    // Document ID: {candidateId}
+    // Fields:
+    //   - jobId: string (required)
+    //   - name: string (required)
+    //   - email: string (required)
+    //   - resumeUrl: string (optional)
+    //   - resumeText: string (optional)
+    //   - score: number (optional)
+    //   - analysis: string (optional)
+    //   - status: string (required)
+    //   - appliedAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "melomaniac210@gmail.com" && request.auth.token.email_verified == true ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isRecruiter() {
+      return isAuthenticated() && 
+        (isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'recruiter'));
+    }
+
+    function isCandidate() {
+      return isAuthenticated() && 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'candidate');
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.email is string &&
+             data.role in ['admin', 'recruiter', 'candidate'];
+    }
+
+    function isValidJob(data) {
+      return data.keys().hasAll(['title', 'description', 'status', 'createdAt']) &&
+             data.title is string && data.title.size() < 200 &&
+             data.description is string && data.description.size() < 5000 &&
+             data.status in ['open', 'closed'];
+    }
+
+    function isValidCandidate(data) {
+      return data.keys().hasAll(['jobId', 'name', 'email', 'status', 'appliedAt']) &&
+             data.name is string && data.name.size() < 100 &&
+             data.email is string &&
+             data.status is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role));
+    }
+
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create: if isRecruiter() && isValidJob(request.resource.data);
+      allow update: if isRecruiter() && isValidJob(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /candidates/{candidateId} {
+      allow read: if isRecruiter() || (isAuthenticated() && request.auth.token.email == resource.data.email);
+      allow create: if isRecruiter() || (isAuthenticated() && request.auth.token.email == request.resource.data.email && isValidCandidate(request.resource.data));
+      allow update: if isRecruiter();
+      allow delete: if isAdmin();
+    }
+  }
+}

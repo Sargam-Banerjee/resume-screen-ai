@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "Job": {
+      "title": "Job Posting",
+      "description": "A job posting with requirements and metadata.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "requirements": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["title", "description", "status", "createdAt", "createdBy"]
+    },
+    "Candidate": {
+      "title": "Candidate",
+      "description": "A candidate who has applied for a job.",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "resumeUrl": { "type": "string" },
+        "resumeText": { "type": "string" },
+        "score": { "type": "number" },
+        "analysis": { "type": "string" },
+        "status": { "type": "string", "enum": ["applied", "screening", "shortlisted", "rejected", "interviewing", "hired"] },
+        "appliedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["jobId", "name", "email", "status", "appliedAt"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with role-based permissions.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "recruiter"] },
+        "name": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/jobs/{jobId}": {
+      "schema": "Job",
+      "description": "Collection of job postings."
+    },
+    "/candidates/{candidateId}": {
+      "schema": "Candidate",
+      "description": "Collection of candidates and their applications."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles."
+    }
+  }
+}
